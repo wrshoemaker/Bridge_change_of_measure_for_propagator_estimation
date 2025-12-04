@@ -206,7 +206,7 @@ plt.axhline(target_prop, color='red', linestyle='--', linewidth=2, label="Target
 plt.axhline(empirical_prop, color='green', linestyle='--', linewidth=2, label="Estimator")
 plt.legend(fontsize=10,frameon=False,loc="upper right")
 plt.ylim(0,1.2)
-plt.savefig("figures/OU_propagator_MC_samples.pdf",bbox_inches="tight")
+plt.savefig("figures/OU_propagator_MC_samples.pdf",bbox_inches="tight",transparent=True)
 plt.show();plt.close()
 
 Plot_bonito(ylabel=r"$\rho(L)$", xlabel=r"$L$", x_size=4, y_size=3)
@@ -215,9 +215,8 @@ plt.axvline(target_prop, color='red', linestyle='--', linewidth=2, label="Target
 plt.axvline(empirical_prop, color='green', linestyle='--', linewidth=2, label="Empirical")
 
 plt.legend(fontsize=10,frameon=False,loc="upper right")
-plt.tight_layout()
-plt.show()
-plt.close()
+plt.savefig("figures/OU_propagator_MC_histogram.pdf",bbox_inches="tight",transparent=True)
+plt.show();plt.close()
 
 print(f"Target OU propagator: {target_prop}")
 print(f"Empirical OU propagator from Wiener bridges: {empirical_prop}")

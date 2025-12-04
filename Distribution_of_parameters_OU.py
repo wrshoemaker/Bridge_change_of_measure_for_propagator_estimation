@@ -48,7 +48,7 @@ def axis_bonito(ax,xlabel=r" $ x$",ylabel=r"$ y$",label_font_size=15,ticks_size=
         #plt.subplots_adjust(hspace=0)
 #%% Functions
 
-def simulate_ou_exact(mu, mu, x0, dt, n_steps, random_state=None):
+def simulate_ou_exact(mu,tau, x0, dt, n_steps, random_state=None):
     """
     Simulate an Ornstein–Uhlenbeck process using the exact transition:
 

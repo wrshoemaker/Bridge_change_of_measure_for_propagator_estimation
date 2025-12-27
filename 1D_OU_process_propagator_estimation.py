@@ -113,7 +113,7 @@ def propagator_WI_process(x, t, x0, D):
 
 def Fill_gaps_with_Wiener_bridges(dt, tf, t0=0, x0=0, xf=0):
     """
-    Simulate a Wiener (Brownian) bridge on [t0, tf] from x0 to xf
+    Simulate a Wiener bridge on [t0, tf] from x0 to xf
     using a time step dt.
 
     Returns
@@ -157,16 +157,68 @@ def Fill_gaps_with_Wiener_bridges(dt, tf, t0=0, x0=0, xf=0):
 
     return ts, xs
 
+def Fill_gaps_with_Brownian_bridges(dt, tf, t0=0.0, x0=0.0, xf=0.0, D=1.0):
+    """
+    Simulate a Brownian bridge on [t0, tf] from x0 to xf
+    with diffusion coefficient D, using time step dt.
+
+    dX_t = D dW_t
+
+    Returns
+    -------
+    ts : np.ndarray
+        Time grid from t0 to tf.
+    xs : np.ndarray
+        Bridge values X_t at those times.
+    """
+    if tf <= t0:
+        raise ValueError("tf must be greater than t0")
+    if dt <= 0:
+        raise ValueError("dt must be positive")
+    if D <= 0:
+        raise ValueError("D must be positive")
+
+    # Number of points
+    npoints = int(np.round((tf - t0) / dt)) + 1
+    ts = t0 + np.arange(npoints) * dt
+    ts[-1] = tf  # force exact final time
+
+    xs = np.zeros(npoints)
+    xs[0] = x0
+    xs[-1] = xf
+
+    x = x0
+    for i in range(1, npoints - 1):
+        s = ts[i - 1]   # previous time
+        t = ts[i]       # current time
+        h = t - s       # time step
+
+        # Brownian bridge conditional law
+        denom = (tf - s)
+
+        mean = x + h * (xf - x) / denom
+        var  = (D**2) * h * (tf - t) / denom
+        std  = np.sqrt(var)
+
+        x = mean + std * np.random.normal()
+        xs[i] = x
+
+    return ts, xs
+
+
 # %% Additive OU process
-D = 1.0  # Diffusion coefficient
+D = 0.1  # Diffusion coefficient
 mu = 1.0  # mean
 k = 1.0  # strength of the restoring force (inverse of correlation time)
 
 x0 = mu
-xf = mu+0.1
 tf = 1.0
 t0 = 0.0
 tfmt0 = tf - t0
+mean = mu + (x0 - mu) * np.exp(-k * tfmt0)
+var = (D**2 / (2 * k)) * (1 - np.exp(-2 * k * tfmt0))
+xf = mean+ np.sqrt(var) * np.random.normal()
+
 target_prop = propagator_OU_process(xf, tfmt0, x0, mu, k, D)
 
 
@@ -180,7 +232,7 @@ tfmt0 = tf - t0  # make sure this is defined
 Ls = np.zeros(Nbridges)
 
 for i in range(Nbridges):
-    ts_bridge, xs_bridge = Fill_gaps_with_Wiener_bridges(dt_bridge, tf, t0, x0, xf)
+    ts_bridge, xs_bridge = Fill_gaps_with_Brownian_bridges(dt_bridge, tf, t0, x0, xf,D)
 
     # OU drift
     b = -k * (xs_bridge - mu)

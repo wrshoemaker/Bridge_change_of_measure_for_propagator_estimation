@@ -7,6 +7,7 @@ import numpy as np
 from numpy import exp as exp
 from numpy import log as log
 from numpy import sqrt as sqrt
+from scipy.special import gamma  # Γ function
 import networkx as nx
 import matplotlib.pyplot as plt
 import time
@@ -81,6 +82,7 @@ def gamma_distribution(x, shape, rate):
     pdf[mask] = coeff * (x[mask] ** (shape - 1)) * np.exp(-rate * x[mask])
 
     return pdf
+
 
 def evaluate_stationary_distribution(x, model, mu,K,D):
     """

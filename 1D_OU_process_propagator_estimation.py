@@ -7,6 +7,7 @@ import numpy as np
 from numpy import exp as exp
 from numpy import log as log
 from numpy import sqrt as sqrt
+from scipy.special import gamma  # Γ function
 import networkx as nx
 import matplotlib.pyplot as plt
 import time

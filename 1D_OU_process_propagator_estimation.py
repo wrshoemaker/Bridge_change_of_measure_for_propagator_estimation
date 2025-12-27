@@ -207,7 +207,7 @@ def Fill_gaps_with_Brownian_bridges(dt, tf, t0=0.0, x0=0.0, xf=0.0, D=1.0):
 
 
 # %% Additive OU process
-D = 0.1  # Diffusion coefficient
+D = 1.0  # Diffusion coefficient
 mu = 1.0  # mean
 k = 1.0  # strength of the restoring force (inverse of correlation time)
 

@@ -24,6 +24,9 @@ x^{\frac{2k\mu}{D^2} - \theta - 1}
 e^{-\frac{2kx}{D^2}}.
 $$
 
+## Instructions
+In order to run the .py codes, a folder named "figures" has to be created in order to store outcomes.
+
 ## License
 
 This project is shared for **academic and research purposes**. It is free to use, redistribute, modify, and share for research purposes, provided that proper credit is given to the authors through citation of:

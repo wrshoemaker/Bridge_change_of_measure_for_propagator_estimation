@@ -1,3 +1,4 @@
 # Ignore generated figures
 figures/*.pdf
 
+.DS_Store

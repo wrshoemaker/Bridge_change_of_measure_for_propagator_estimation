@@ -8,6 +8,7 @@ from numpy import exp as exp
 from numpy import log as log
 from numpy import sqrt as sqrt
 from scipy.special import gamma  # Γ function
+from scipy.special import iv  # modified Bessel I_v
 import networkx as nx
 import matplotlib.pyplot as plt
 import time
@@ -49,6 +50,40 @@ def axis_bonito(ax,xlabel=r" $ x$",ylabel=r"$ y$",label_font_size=15,ticks_size=
         #plt.subplots_adjust(hspace=0)
 
 # %% Functions
+def Update_system_general_gamma_model(x0,t0,tf, dt_int,theta,mu,k,D):
+    """Update system from x0 to x=x(tf) using Milstein method"""
+
+    steps=int((tf-t0)/dt_int)
+    sqdt = sqrt(dt_int)
+    D2 = D*D
+    dtheta = (theta+1.0)/2.0
+    x = x0
+    t = t0
+    for ii in range(steps):
+        t=t+dt_int
+        u=np.random.normal()
+        xth = x**(theta)
+        milstein = D2*dtheta*xth*dt_int/2.0
+        drift = k*(mu-x)*xth*dt_int 
+        noise = D*(x**(dtheta))*sqdt
+        xnew=x+drift+noise*u+milstein*(u*u-1.0)
+        x = xnew
+    return x
+
+def Estimate_propagator_standard_MC(x0,t0,tf,dt_int,realiz,x_target,dx,theta,mu,k,D):
+    th = dx/2.0
+    count = 0
+    for ii in range(realiz):
+        x =  Update_system_general_gamma_model(x0,t0,tf, dt_int,theta,mu,k,D)
+        if (x>(x_target-th))and(x<=(x_target+th)):
+            count+=1
+    prop = count/realiz/dx
+    return prop
+
+def h_I(y,D):
+    """Inverse of Lamperti transform in EN model"""
+    return exp(y*D)
+
 def gaussian(x, mean, variance):
     """Evaluate the Gaussian distribution at x with given mean and variance."""
     coeff = 1.0 / np.sqrt(2 * np.pi * variance)
@@ -83,6 +118,7 @@ def gamma_distribution(x, shape, rate):
 
     return pdf
 
+
 def evaluate_stationary_distribution(x, model, mu,K,D):
     """
     Evaluate either a Gaussian (if model == 'OU') or Gamma (if model == 'DE') distribution.
@@ -103,7 +139,7 @@ def evaluate_stationary_distribution(x, model, mu,K,D):
         return gamma_distribution(x, param1, param2)
     else:
         raise ValueError("Unknown model. Use 'OU' for Gaussian or 'DE' for Gamma.")
-
+    
 def propagator_OU_process(x, t, x0, mu, K, D):
     """
     Compute the propagator (transition probability density) of the Ornstein-Uhlenbeck process.
@@ -122,6 +158,52 @@ def propagator_OU_process(x, t, x0, mu, K, D):
     mean = mu + (x0 - mu) * np.exp(-K * t)
     variance = (D**2 / (2 * K)) * (1 - np.exp(-2 * K * t))
     return gaussian(x, mean, variance)
+
+def propagator_DE_process(x, t, x0, mu, k, D):
+    """
+    Exact transition density (propagator) of the DE (a.k.a. CIR) process
+
+        dX_t = k (mu - X_t) dt + D sqrt(X_t) dW_t
+
+    Parameters
+    ----------
+    x : float or np.ndarray
+        Final state(s), x >= 0
+    t : float
+        Time increment (t > 0)
+    x0 : float
+        Initial state (x0 >= 0)
+    k : float
+        Mean-reversion strength
+    mu : float
+        Long-term mean
+    D : float
+        Diffusion coefficient
+
+    Returns
+    -------
+    pdf : float or np.ndarray
+        Transition density p(x, t | x0)
+    """
+    x = np.asarray(x)
+
+    c = 2 * k / (D**2 * (1 - np.exp(-k * t)))
+    u = c * x0 * np.exp(-k * t)
+    v = c * x
+    q = 2 * k * mu / D**2 - 1
+
+    pdf = np.zeros_like(x, dtype=float)
+    mask = x >= 0
+
+    pdf[mask] = (
+        c
+        * np.exp(-(u + v[mask]))
+        * (v[mask] / u) ** (q / 2)
+        * iv(q, 2 * np.sqrt(u * v[mask]))
+    )
+
+    return pdf
+
 
 def propagator_WI_process(x, t, x0, D):
     """
@@ -234,9 +316,47 @@ def Fill_gaps_with_Brownian_bridges(dt, tf, t0=0.0, x0=0.0, xf=0.0, D=1.0):
 
     return ts, xs
 
+def propagator_EN_process(t0,tf, xf,x0, mu, k, D,Nbridges=1000,dt_bridge=0.001):
+    #Make Lamperti transformation of data to use bridges of Wiener process and compute Jacobian of transformation and Radon-Nikodym derivative between bridge and its undonditioned version (propagator)
+    y0 = log(x0)  / D
+    yf = log(xf)  / D
+    J  = 1.0 / xf / D 
 
-# %% Additive OU process
-D = 3.0  # Diffusion coefficient
+    tfmt0 = tf - t0  
+    prop_WI = propagator_WI_process(yf, tfmt0, y0, D=1)  # Wiener propagator
+
+    # Draw bridges, evaluate Radon-Nykodim derivatives and compute empirical propagator
+    Ls = np.zeros(Nbridges)
+
+    for i in range(Nbridges): #For every bridge, compute the Radon-Nykodym derivative between unconditioned processes
+        ts_bridge, ys_bridge = Fill_gaps_with_Brownian_bridges(dt_bridge, tf, t0, y0, yf, D=1)
+
+        # DE-transformed drift
+        xs_bridge = h_I(ys_bridge,D)
+        Bs = xs_bridge * D
+        Bs_der = D 
+        b  = - k * (xs_bridge - mu)*xs_bridge/ Bs - 0.5*Bs_der
+        beta = (xf - xs_bridge[:-1]) / (tf - ts_bridge[:-1])
+
+        # Girsanov exponent components (left-point rule)
+        dy = np.diff(ys_bridge)
+        dt = np.diff(ts_bridge)
+
+        state_integral  =  np.sum(b[:-1] * dy) #This could be computed exactly
+        time_integral   =  np.sum(b[:-1]**2.0 * dt)
+        # bridge_integral =  np.sum(b[:-1] * beta * dt)
+
+        # log_weight = state_integral - 0.5 * time_integral - bridge_integral
+        log_weight = state_integral - 0.5 * time_integral 
+        weight = np.exp(log_weight)
+        Ls[i] = weight
+
+    empirical_prop = np.mean(Ls)*J* prop_WI
+    Ls = Ls*J* prop_WI
+    return empirical_prop,Ls
+
+# %% EN process
+D = 0.1  # Diffusion coefficient
 mu = 1.0  # mean
 k = 1.0  # strength of the restoring force (inverse of correlation time)
 
@@ -244,65 +364,65 @@ x0 = mu
 tf = 1.0
 t0 = 0.0
 tfmt0 = tf - t0
-mean = mu + (x0 - mu) * np.exp(-k * tfmt0)
-var = (D**2 / (2 * k)) * (1 - np.exp(-2 * k * tfmt0))
-xf = mean+ np.sqrt(var) * np.random.normal()
 
-target_prop = propagator_OU_process(xf, tfmt0, x0, mu, k, D)
+xf = x0 + 0.1
 
-
-# %% Draw bridges, evaluate Radon-Nykodim derivatives and compute empirical propagator
-
-Nbridges = 1000
-dt_bridge = 0.01
-prop_WI = propagator_WI_process(xf, tfmt0, x0, D)  # Wiener propagator
-
-tfmt0 = tf - t0  # make sure this is defined
-
-Ls = np.zeros(Nbridges)
-
-for i in range(Nbridges):
-    ts_bridge, xs_bridge = Fill_gaps_with_Brownian_bridges(dt_bridge, tf, t0, x0, xf,D)
-
-    # OU drift
-    b = -k * (xs_bridge - mu)
-
-    # Girsanov exponent components (left-point rule)
-    dx = np.diff(xs_bridge)
-    dt = np.diff(ts_bridge)
-
-    state_integral = (1.0 / D**2) * np.sum(b[:-1] * dx) #This could be computed exactly
-    time_integral  = (1.0 / D**2) * np.sum(b[:-1]**2 * dt)
-
-    log_weight = state_integral - 0.5 * time_integral
-    weight = np.exp(log_weight)
-
-    Ls[i] = weight 
-
-empirical_prop = np.mean(Ls)* prop_WI
-Ls = Ls*prop_WI
+Nbridges = 10000
+empirical_prop,Ls = propagator_EN_process(t0,tf, xf,x0, mu, k, D,Nbridges,dt_bridge=0.001)
 
 Plot_bonito(xlabel="Sample index", ylabel=r"$L$", x_size=4, y_size=3)
 plt.scatter(np.arange(Nbridges), Ls, s=5, alpha=0.4, label="Samples",color="dodgerblue")
-plt.axhline(target_prop, color='red', linestyle='--', linewidth=2, label="Target")
 plt.axhline(empirical_prop, color='green', linestyle='--', linewidth=2, label="Estimator")
 plt.legend(fontsize=10,frameon=False,loc="upper right")
 plt.ylim(0,1.2)
-plt.savefig("figures/OU_propagator_MC_samples.pdf",bbox_inches="tight",transparent=True)
+plt.savefig("figures/EN_propagator_MC_samples.pdf",bbox_inches="tight",transparent=True)
 plt.show();plt.close()
+
 
 Plot_bonito(ylabel=r"$\rho(L)$", xlabel=r"$L$", x_size=4, y_size=3)
-plt.hist(Ls, bins=50, density=True, alpha=0.4, color='dodgerblue', label='Histogram')
-plt.axvline(target_prop, color='red', linestyle='--', linewidth=2, label="Target")
-plt.axvline(empirical_prop, color='green', linestyle='--', linewidth=2, label="Empirical")
 
-plt.legend(fontsize=10,frameon=False,loc="upper right")
-plt.savefig("figures/OU_propagator_MC_histogram.pdf",bbox_inches="tight",transparent=True)
-plt.show();plt.close()
+hist, bin_edges = np.histogram(Ls, bins=50, density=True)
+bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
+mode_L = bin_centers[np.argmax(hist)]
+plt.hist(Ls, bins=50, density=True, alpha=0.4,
+         color='dodgerblue', label='Histogram')
+plt.axvline(empirical_prop, color='green', linestyle='--',
+            linewidth=2, label="Empirical")
+plt.axvline(mode_L, color='red', linestyle=':',
+            linewidth=2, label="Mode")
 
-print(f"Target OU propagator: {target_prop}")
-print(f"Empirical OU propagator from Wiener bridges: {empirical_prop}")
-print(f"Relative error: {(abs(empirical_prop - target_prop) / target_prop )*100:.4f} %")
-
+plt.legend(fontsize=10, frameon=False, loc="upper right")
+plt.savefig("figures/EN_propagator_MC_histogram.pdf",
+            bbox_inches="tight", transparent=True)
+plt.show()
+plt.close()
 
 # %%
+#Classical MC
+realiz = 10000
+dt_int = tfmt0/100
+theta = 1
+xfs = np.zeros(realiz)
+for ii in range(realiz):
+    x = Update_system_general_gamma_model(x0,t0,tf, dt_int,theta,mu,k,D)
+    xfs[ii]=x
+#Bridge change of measure
+N_bridges = 1000
+x_targets = np.linspace(0.75,1.25,10)
+props = np.zeros(len(x_targets))
+for ii, xf in enumerate(x_targets):
+    empirical_prop,Ls = propagator_EN_process(t0,tf, xf,x0, mu, k, D,Nbridges,dt_bridge=0.001)
+    props[ii] = empirical_prop
+
+
+Plot_bonito(xlabel=r"$ x$", ylabel=r"$ p(x,t|x_0)$", x_size=4, y_size=3)
+bins = np.linspace(xfs.min(),xfs.max(),50)
+plt.hist(xfs,bins=bins,density=True,label="Classic MC",alpha=0.4,color='dodgerblue')
+plt.yscale('log')
+
+plt.scatter(x_targets,props,color='red',label='Bridge estimation',s=25)
+plt.legend(fontsize=10,frameon=False,loc="upper right")
+plt.xlim(0.7,1.4)
+plt.ylim(1e-4,1e3)
+plt.savefig("figures/EN_propagator_comparison_MC_bridges.pdf",bbox_inches="tight",transparent=True)
+plt.show();plt.close()

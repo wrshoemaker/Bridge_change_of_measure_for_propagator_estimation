@@ -50,6 +50,10 @@ def axis_bonito(ax,xlabel=r" $ x$",ylabel=r"$ y$",label_font_size=15,ticks_size=
         #plt.subplots_adjust(hspace=0)
 
 # %% Functions
+def h_I(y,D):
+    """Inverse of Lamperti transform in DE model"""
+    return (y*D/2.0)**2.0
+
 def gaussian(x, mean, variance):
     """Evaluate the Gaussian distribution at x with given mean and variance."""
     coeff = 1.0 / np.sqrt(2 * np.pi * variance)
@@ -284,7 +288,7 @@ def Fill_gaps_with_Brownian_bridges(dt, tf, t0=0.0, x0=0.0, xf=0.0, D=1.0):
 
 
 # %% Additive OU process
-D = 1.0  # Diffusion coefficient
+D = 2.0  # Diffusion coefficient
 mu = 1.0  # mean
 k = 1.0  # strength of the restoring force (inverse of correlation time)
 
@@ -301,33 +305,39 @@ target_prop = propagator_DE_process(xf, tfmt0, x0, mu, k, D)
 y0 = sqrt(x0) * 2.0 / D
 yf = sqrt(xf) * 2.0 / D
 J  = 1.0 / sqrt(xf) / D 
-prop_WI = propagator_WI_process(yf, tfmt0, y0, D=1.0)  # Wiener propagator
+
+prop_WI = propagator_WI_process(yf, tfmt0, y0, D=1)  # Wiener propagator
 
 # Draw bridges, evaluate Radon-Nykodim derivatives and compute empirical propagator
 
-Nbridges = 1000
-dt_bridge = 0.01
+Nbridges = 10000
+dt_bridge = 0.001
 
 tfmt0 = tf - t0  # make sure this is defined
 
 Ls = np.zeros(Nbridges)
 
 for i in range(Nbridges): #For every bridge, compute the Radon-Nykodym derivative between unconditioned processes
-    ts_bridge, xs_bridge = Fill_gaps_with_Wiener_bridges(dt_bridge, tf, t0, y0, yf)
+    ts_bridge, ys_bridge = Fill_gaps_with_Brownian_bridges(dt_bridge, tf, t0, y0, yf, D=1)
 
     # DE-transformed drift
-    b = -k * (xs_bridge - mu)
+    xs_bridge = h_I(ys_bridge,D)
+    Bs = sqrt(xs_bridge) * D
+    Bs_der = D / 2.0 / sqrt(xs_bridge)
+    b  = - k * (xs_bridge - mu)/ Bs - 0.5*Bs_der
+    beta = (xf - xs_bridge[:-1]) / (tf - ts_bridge[:-1])
 
     # Girsanov exponent components (left-point rule)
-    dx = np.diff(xs_bridge)
+    dy = np.diff(ys_bridge)
     dt = np.diff(ts_bridge)
 
-    state_integral =  np.sum(b[:-1] * dx) #This could be computed exactly
-    time_integral  =  np.sum(b[:-1]**2 * dt)
+    state_integral  =  np.sum(b[:-1] * dy) #This could be computed exactly
+    time_integral   =  np.sum(b[:-1]**2.0 * dt)
+    bridge_integral =  np.sum(b[:-1] * beta * dt)
 
-    log_weight = state_integral - 0.5 * time_integral
+    # log_weight = state_integral - 0.5 * time_integral - bridge_integral
+    log_weight = state_integral - 0.5 * time_integral 
     weight = np.exp(log_weight)
-
     Ls[i] = weight
 
 empirical_prop = np.mean(Ls)*J* prop_WI
@@ -354,6 +364,7 @@ plt.show();plt.close()
 print(f"Target DE propagator: {target_prop}")
 print(f"Empirical DE propagator from Wiener bridges: {empirical_prop}")
 print(f"Relative error: {(abs(empirical_prop - target_prop) / target_prop )*100:.4f} %")
+
 
 
 # %%

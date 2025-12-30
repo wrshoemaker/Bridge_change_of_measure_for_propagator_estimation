@@ -25,7 +25,7 @@ e^{-\frac{2kx}{D^2}}.
 $$
 
 ## Instructions
-In order to run the .py codes, a folder named "figures" has to be created in order to store outcomes.
+In order to run the .py codes, a folder named "figures" has to be created to store outcomes.
 
 ## License
 

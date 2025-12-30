@@ -1,1 +1,1 @@
-### Bridge Change of Measure for Propagator Estimation
+# Bridge Change of Measure for Propagator Estimation

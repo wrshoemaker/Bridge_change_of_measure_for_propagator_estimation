@@ -16,6 +16,11 @@ from mpl_toolkits.mplot3d import Axes3D  # noqa: F401 unused import
 from matplotlib import cm
 from matplotlib.ticker import LinearLocator, FormatStrFormatter
 import matplotlib.patches as patches
+
+
+import utils
+
+
 matplotlib.rcParams.update({'figure.autolayout': True})
 matplotlib.rcParams['mathtext.fontset'] = 'custom'
 matplotlib.rcParams['mathtext.rm'] = 'Bitstream Vera Sans'
@@ -46,52 +51,6 @@ def axis_bonito(ax,xlabel=r" $ x$",ylabel=r"$ y$",label_font_size=12,ticks_size=
        # #-----plots--------
         #plt.subplots_adjust(hspace=0)
 
-# %% Functions
-def Fill_gaps_with_Wiener_bridges(dt, tf, t0=0, x0=0, xf=0):
-    """
-    Simulate a Wiener (Brownian) bridge on [t0, tf] from x0 to xf
-    using a time step dt.
-
-    Returns
-    -------
-    ts : np.ndarray
-        Time grid from t0 to tf.
-    xs : np.ndarray
-        Bridge values X_t at those times.
-    """
-    if tf <= t0:
-        raise ValueError("tf must be greater than t0")
-    if dt <= 0:
-        raise ValueError("dt must be positive")
-
-    # Number of points
-    npoints = int(np.round((tf - t0) / dt)) + 1
-    ts = t0 + np.arange(npoints) * dt
-    ts[-1] = tf  # force exact final time
-
-    xs = np.zeros(npoints)
-    xs[0] = x0
-    xs[-1] = xf
-
-    x = x0
-    for i in range(1, npoints - 1):
-        s = ts[i - 1]  # previous time
-        t = ts[i]      # current time
-        h = t - s      # time step (≈ dt)
-
-        # Brownian bridge conditional law:
-        # X_t | X_s = x, X_tf = xf ~ N(mean, var) with
-        # mean = x + (h / (tf - s)) * (xf - x)
-        # var  = h * (tf - t) / (tf - s)
-        denom = (tf - s)
-        mean = x + h * (xf - x) / denom
-        var = h * (tf - t) / denom
-        std = np.sqrt(var)
-
-        x = mean + std * np.random.normal()
-        xs[i] = x
-
-    return ts, xs
 
 
 # %%
@@ -120,7 +79,7 @@ Plot_bonito(ylabel=r"$X_t$",xlabel=r"$t$")
 
 N = 50
 for jj in range(N):
-    ts,xs =  Fill_gaps_with_Wiener_bridges(dt,tf,t0=0,xf=0,x0=0)    
+    ts,xs =  utils.Fill_gaps_with_Wiener_bridges(dt,tf,t0=0,xf=0,x0=0)    
     plt.plot(ts,xs,alpha=0.3)
 plt.plot(ts,2.0*sqrt(ts) ,color="black",ls="--")
 plt.plot(ts,-2.0*sqrt(ts),color="black",ls="--")

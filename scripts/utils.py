@@ -7,6 +7,7 @@ from scipy.optimize import curve_fit
 from scipy.special import gamma as gamma_func
 from scipy.special import iv  # modified Bessel I_v
 from scipy.stats import gamma
+from scipy.special import logsumexp
 
 
 
@@ -574,9 +575,22 @@ def sampling_propagator_gamma_process_BCM(time, sampled_n, n_reads_total, mu, D,
 
         empirical_prop_t = propagator_gamma_process_BCM(t0, t1, x_underline_t0 , x_underline_t1, mu, k, D, theta, n_bridges, dt_bridge=0.001)
         
+        # propagator_gamma_process_BCM = ratio of probabilities
+
         # log likelihood for each iteration.
         # average over all iterations
-        log_normalized_l += np.mean(np.log(empirical_prop_t) - np.log(pdf_val[t_idx + 1]))
+        #log_normalized_l += np.mean(np.log(empirical_prop_t) - np.log(pdf_val[t_idx + 1]))
+
+        # the loglikelihood is the log over the integral(i.e., sum)
+        #log_normalized_l += np.log(np.mean(empirical_prop_t / pdf_val[t_idx + 1]))
+        # faster
+        log_r = np.log(empirical_prop_t) - np.log(pdf_val[t_idx + 1])
+        log_normalized_l += logsumexp(log_r) - np.log(log_r.size)
+
+
+        # log mean ratio is log marginal likelihood
+        # mean log ratio = ELBO. Always biased downards, favors parameters that reduce varaince of ratio.
+        # ==> why we're getting bettern LLs for small, wrong k?
 
 
     return log_normalized_l

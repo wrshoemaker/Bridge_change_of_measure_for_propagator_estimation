@@ -8,6 +8,7 @@ from numpy import log as log
 from numpy import sqrt as sqrt
 
 import matplotlib.pyplot as plt
+from matplotlib.colors import TwoSlopeNorm
 
 import pickle
 import config
@@ -36,8 +37,8 @@ n_samples = int(total_t/delta_t)
 time = np.arange(0, total_t, step=delta_t)
 n_pairs = len(time) - 1
 
-n_reads_total_set = 10000
-n_reads_total = np.repeat(n_reads_total_set, n_samples)
+#n_reads_total_set = 10000
+#n_reads_total = np.repeat(n_reads_total_set, n_samples)
 
 # inference params
 # number of draws from gamma
@@ -117,15 +118,25 @@ def plot_simulation(n_reads_total):
             Z[ep_k_idx, ep_D_idx] = mean_delta_l
 
 
-    cmap = plt.cm.Blues.copy()
+    #cmap = plt.cm.Blues.copy()
+    cmap = plt.cm.RdBu.copy()
     cmap.set_bad(color="black")
+
+    #print(np.nanmin(Z))
+    #vabs = max(abs(np.nanmin(Z)), abs(np.nanmax(Z)))
+    vabs = 5000
+
+    norm = TwoSlopeNorm(vmin=-vabs, vcenter=0.0, vmax=vabs)
 
     fig, ax = plt.subplots()
 
-    im = ax.imshow(Z, origin="lower", aspect="equal", cmap=cmap, vmin=0, vmax=np.nanmax(Z))
+    #im = ax.imshow(Z, origin="lower", aspect="equal", cmap=cmap, vmin=np.nanmin(Z), vmax=np.nanmax(Z))
+
+    im = ax.imshow(Z, origin="lower", aspect="equal", cmap=cmap, norm=norm)
+    #print(np.nanmin(Z), np.nanmax(Z))
     
     cbar = fig.colorbar(im, ax=ax)
-    cbar.set_label(r'$ \bar{\ell} - \bar{\ell}_{\mathrm{true}} $')
+    cbar.set_label(r'$ \bar{\ell}_{\mathrm{false}} - \bar{\ell}_{\mathrm{true}} $')
 
     ax.set_xticks(np.arange(len(ep_all)))
     ax.set_yticks(np.arange(len(ep_all)))
@@ -143,8 +154,8 @@ def plot_simulation(n_reads_total):
 
 
 
-    ax.set_xlabel(r'$\frac{k}{k_{\mathrm{true}}}$', fontsize=12)
-    ax.set_ylabel(r'$\frac{D}{D_{\mathrm{true}}}$', fontsize=12)
+    ax.set_xlabel(r'$\frac{k_{\mathrm{false}}}{k_{\mathrm{true}}}$', fontsize=12)
+    ax.set_ylabel(r'$\frac{D_{\mathrm{false}}}{D_{\mathrm{true}}}$', fontsize=12)
     
     fig.subplots_adjust(hspace=0.25, wspace=0.25)
     fig_name = "%ssimulation_heatmap_%d.png" % (config.analysis_directory, n_reads_total)
@@ -163,6 +174,8 @@ def plot_simulation(n_reads_total):
 
 
 if __name__ == "__main__":
+
+    #run_simulation()
 
     for n_reads_total in n_reads_total_set:
 

@@ -1,0 +1,21 @@
+# Conda environment for DADA2 16S reprocessing on Inti (CNRGH/Genoscope).
+#
+# IMPORTANT: Anaconda's `defaults` and `r` channels are under a paid licence and
+# are firewalled institute-wide (repo.anaconda.com is unreachable). Only
+# conda-forge + bioconda are used below, and `nodefaults` makes that explicit.
+# Do not add `defaults` or `pkg=...::` pins from third-party yml files.
+name: dada2_16s
+channels:
+  - conda-forge
+  - bioconda
+  - nodefaults
+dependencies:
+  - r-base=4.4
+  - bioconductor-dada2>=1.30
+  - bioconductor-shortread
+  - bioconductor-biostrings
+  - r-rcppparallel
+  - r-ggplot2
+  - r-data.table
+  - cutadapt          # primer removal, if a study needs it
+  - pigz

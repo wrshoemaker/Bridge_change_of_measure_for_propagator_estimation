@@ -63,7 +63,9 @@ def run_simulation():
             output_dict[n_reads_total_]['sim_results'][ep_D] = {}
             
             for ep_k in ep_all:
-                output_dict[n_reads_total_]['sim_results'][ep_D][ep_k] = []
+                output_dict[n_reads_total_]['sim_results'][ep_D][ep_k] = {}
+                output_dict[n_reads_total_]['sim_results'][ep_D][ep_k]['ll_true'] = []
+                output_dict[n_reads_total_]['sim_results'][ep_D][ep_k]['ll_false'] = []
 
 
     for n_reads_total_ in n_reads_total_set:
@@ -88,8 +90,11 @@ def run_simulation():
                     log_normalized_l_ep = utils.sampling_propagator_gamma_process_BCM(time, sampled_n, n_reads_total, mu, ep_D*D, ep_k*k, theta, n_bridges=n_bridges)
 
                     print(log_normalized_l)
-                    output_dict[n_reads_total_]['sim_results'][ep_D][ep_k].append(log_normalized_l - log_normalized_l_ep)
+                    #output_dict[n_reads_total_]['sim_results'][ep_D][ep_k].append(log_normalized_l - log_normalized_l_ep)
+                    #output_dict[n_reads_total_]['sim_results'][ep_D][ep_k].append(log_normalized_l - log_normalized_l_ep)
 
+                    output_dict[n_reads_total_]['sim_results'][ep_D][ep_k]['ll_true'].append(log_normalized_l)
+                    output_dict[n_reads_total_]['sim_results'][ep_D][ep_k]['ll_false'].append(log_normalized_l_ep)
 
     sys.stderr.write("Saving dictionary...\n")
     with open(test_dict_path, 'wb') as outfile:
@@ -107,7 +112,7 @@ def plot_simulation(n_reads_total):
     for ep_D_idx, ep_D in enumerate(ep_all):
         for ep_k_idx, ep_k in enumerate(ep_all):
 
-            delta_l = np.asarray(test_dict[n_reads_total]['sim_results'][ep_D][ep_k])
+            delta_l = np.asarray(test_dict[n_reads_total]['sim_results'][ep_D][ep_k]['ll_false'])
             delta_l = delta_l[np.isfinite(delta_l)]
 
             if len(delta_l) > 0:
@@ -118,15 +123,18 @@ def plot_simulation(n_reads_total):
             Z[ep_k_idx, ep_D_idx] = mean_delta_l
 
 
+    print(np.nanmin(Z), np.nanmax(Z))
     #cmap = plt.cm.Blues.copy()
     cmap = plt.cm.RdBu.copy()
     cmap.set_bad(color="black")
 
     #print(np.nanmin(Z))
     #vabs = max(abs(np.nanmin(Z)), abs(np.nanmax(Z)))
-    vabs = 5000
+    #vabs = 5000
+    vabs = 7000
 
-    norm = TwoSlopeNorm(vmin=-vabs, vcenter=0.0, vmax=vabs)
+    #norm = TwoSlopeNorm(vmin=-vabs, vcenter=0.0, vmax=vabs)
+    norm = TwoSlopeNorm(vmin=-vabs, vcenter=0.0, vmax=1)
 
     fig, ax = plt.subplots()
 
@@ -136,7 +144,8 @@ def plot_simulation(n_reads_total):
     #print(np.nanmin(Z), np.nanmax(Z))
     
     cbar = fig.colorbar(im, ax=ax)
-    cbar.set_label(r'$ \bar{\ell}_{\mathrm{false}} - \bar{\ell}_{\mathrm{true}} $')
+    #bar.set_label(r'$ \bar{\ell}_{\mathrm{false}} - \bar{\ell}_{\mathrm{true}} $')
+    cbar.set_label(r'$ \bar{\ell}_{\mathrm{false}}$')
 
     ax.set_xticks(np.arange(len(ep_all)))
     ax.set_yticks(np.arange(len(ep_all)))

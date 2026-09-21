@@ -11,7 +11,7 @@ from scipy.special import logsumexp
 
 
 
-
+# logsumexp = log of the sum of exponentials of input elements.
 
 
 
@@ -466,6 +466,7 @@ def h_I(y,D,theta):
         dum2 = 2.0 / dum
         return (y* dum * D /2.0)**dum2
 
+
 def propagator_gamma_process_BCM(t0,tf, x0, xf, mu, k, D,theta,Nbridges=1000,dt_bridge=0.001):
     """Compute propagator of the 1D gamma process via importance sampling using bridges of Wiener process
     If theta=0, the process reduces to the DE (CIR) process and its propagator is computed exactly
@@ -484,6 +485,7 @@ def propagator_gamma_process_BCM(t0,tf, x0, xf, mu, k, D,theta,Nbridges=1000,dt_
         y0 = log(x0)  / D
         yf = log(xf)  / D
         J  = 1.0 / xf / D 
+    
     else:
         dum  = (1.0 - theta)
         dum2 = dum / 2.0
@@ -491,6 +493,7 @@ def propagator_gamma_process_BCM(t0,tf, x0, xf, mu, k, D,theta,Nbridges=1000,dt_
         y0 = 2.0*x0**dum2 / dum / D 
         yf = 2.0*xf**dum2 / dum / D 
         J  = xf**dum3 / D
+
     prop_WI = propagator_WI_process(yf, tfmt0, y0, D=1)  # Wiener propagator
 
     Ls = np.zeros(Nbridges)
@@ -525,6 +528,8 @@ def propagator_gamma_process_BCM(t0,tf, x0, xf, mu, k, D,theta,Nbridges=1000,dt_
     empirical_prop = np.mean(Ls)*J* prop_WI
     Ls = Ls*J* prop_WI
     return empirical_prop
+
+
 
 def Update_system_general_gamma_model(x0,t0,tf, dt_int,theta,mu,k,D):
     """Update system from x0 to x=x(tf) using Milstein method"""
@@ -566,6 +571,9 @@ def sampling_propagator_gamma_process_BCM(time, sampled_n, n_reads_total, mu, D,
     
     
     log_normalized_l = 0
+    w_l = 0
+    ess_l = 0
+    cv2_l = 0
     for t_idx in range(n_samples-1):
         
         t0 = time[t_idx]
@@ -587,10 +595,19 @@ def sampling_propagator_gamma_process_BCM(time, sampled_n, n_reads_total, mu, D,
         log_r = np.log(empirical_prop_t) - np.log(pdf_val[t_idx + 1])
         log_normalized_l += logsumexp(log_r) - np.log(log_r.size)
 
+        #w = empirical_prop_t / pdf_val[t_idx + 1]
+        # effective sample size
+        #ess = (np.sum(w)**2) / np.sum(w**2)
+        #cv2 = np.var(w) / (np.mean(w)**2)
+
+        #w_l += w
+        #ess_l += ess
+        #cv2_l += cv2
+
 
         # log mean ratio is log marginal likelihood
         # mean log ratio = ELBO. Always biased downards, favors parameters that reduce varaince of ratio.
-        # ==> why we're getting bettern LLs for small, wrong k?
+        # ==> why we're getting better LLs for small, wrong k?
 
 
     return log_normalized_l
